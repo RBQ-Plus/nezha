@@ -11,7 +11,6 @@ import (
 	"github.com/naiba/nezha/service/dao"
 )
 
-// AuthorizeOption ..
 type AuthorizeOption struct {
 	Guest    bool
 	Member   bool
@@ -21,11 +20,8 @@ type AuthorizeOption struct {
 	Btn      string
 }
 
-// Authorize ..
 func Authorize(opt AuthorizeOption) func(*gin.Context) {
 	return func(c *gin.Context) {
-		token, err := c.Cookie(dao.Conf.Site.CookieName)
-		token = strings.TrimSpace(token)
 		var code uint64 = http.StatusForbidden
 		if opt.Guest {
 			code = http.StatusBadRequest
@@ -37,18 +33,21 @@ func Authorize(opt AuthorizeOption) func(*gin.Context) {
 			Link:  opt.Redirect,
 			Btn:   opt.Btn,
 		}
-		if token != "" {
 
-		}
 		var isLogin bool
-		var u model.User
-		err = dao.DB.Where("token = ?", token).First(&u).Error
-		if err == nil {
-			isLogin = u.TokenExpired.After(time.Now())
+
+		token, _ := c.Cookie(dao.Conf.Site.CookieName)
+		token = strings.TrimSpace(token)
+		if token != "" {
+			var u model.User
+			if err := dao.DB.Where("token = ?", token).First(&u).Error; err == nil {
+				isLogin = u.TokenExpired.After(time.Now())
+			}
+			if isLogin {
+				c.Set(model.CtxKeyAuthorizedUser, &u)
+			}
 		}
-		if isLogin {
-			c.Set(model.CtxKeyAuthorizedUser, &u)
-		}
+
 		// 已登录且只能游客访问
 		if isLogin && opt.Guest {
 			ShowErrorPage(c, commonErr, opt.IsPage)
